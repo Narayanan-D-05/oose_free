@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Register | FreeLaunch</title>
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <h1>Create Account</h1>
+        <p id="auth-message" class="error"></p>
+        <form id="register-form" class="grid">
+          <label>Role
+            <select name="role" required>
+              <option value="company">Company</option>
+              <option value="freelancer">Freelancer</option>
+            </select>
+          </label>
+          <label>Email <input name="email" type="email" required /></label>
+          <label>Password <input name="password" type="password" required /></label>
+          <label>Company Name (if company) <input name="company_name" type="text" /></label>
+          <label>Full Name (if freelancer) <input name="full_name" type="text" /></label>
+          <label>Skills (comma separated) <input name="skills" type="text" /></label>
+          <button type="submit">Register</button>
+        </form>
+      </section>
+    </main>
+    <script type="module" src="/js/auth.js"></script>
+  </body>
+</html>

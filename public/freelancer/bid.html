@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Submit Bid</title><link rel="stylesheet" href="/css/main.css" /></head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <h1>Submit Bid</h1>
+        <form id="bid-form" class="grid">
+          <label>Project ID <input name="project_id" required /></label>
+          <label>Bid Amount <input name="bid_amount" type="number" required /></label>
+          <label>Estimated Days <input name="estimated_days" type="number" /></label>
+          <label>Cover Letter <textarea name="cover_letter"></textarea></label>
+          <button type="submit">Send Bid</button>
+        </form>
+        <pre id="result"></pre>
+      </section>
+    </main>
+    <script type="module" src="/js/freelancer.js"></script>
+  </body>
+</html>

@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/admin.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card hero-admin">
+        <div class="header">
+          <h1>Admin Control Center</h1>
+          <button id="logout-btn" class="ghost">Logout</button>
+        </div>
+        <h2>Stats</h2>
+        <pre id="stats-output">Loading...</pre>
+        <h2>Users</h2>
+        <pre id="users-output">Loading...</pre>
+        <h2>Disputes</h2>
+        <pre id="disputes-output">Loading...</pre>
+      </section>
+    </main>
+    <script type="module" src="/js/auth.js"></script>
+    <script type="module" src="/js/admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,16 @@
+{
+  "name": "freelaunch",
+  "version": "1.0.0",
+  "description": "FreeLaunch freelancer marketplace with Vercel serverless backend",
+  "type": "module",
+  "scripts": {
+    "dev": "vercel dev --listen 3000",
+    "start": "vercel dev --listen 3000"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.4"
+  },
+  "devDependencies": {
+    "vercel": "^39.1.0"
+  }
+}

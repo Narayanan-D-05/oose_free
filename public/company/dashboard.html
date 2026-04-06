@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Company Dashboard</title>
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/company.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card hero-company">
+        <div class="header">
+          <h1>Company Dashboard</h1>
+          <div class="nav">
+            <a href="/company/post-project.html">Post Project</a>
+            <button id="logout-btn" class="ghost">Logout</button>
+          </div>
+        </div>
+        <p class="notice">Signed in as: <span id="role-badge"></span></p>
+        <h2>Open Projects</h2>
+        <pre id="projects-output">Loading...</pre>
+      </section>
+    </main>
+    <script type="module" src="/js/auth.js"></script>
+    <script type="module" src="/js/company.js"></script>
+  </body>
+</html>

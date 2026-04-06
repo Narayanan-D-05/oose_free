@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Post Project</title>
+    <link rel="stylesheet" href="/css/main.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card">
+        <h1>Post New Project</h1>
+        <form id="post-project-form" class="grid">
+          <label>Title <input name="title" required /></label>
+          <label>Description <textarea name="description" rows="4" required></textarea></label>
+          <label>Budget Min <input type="number" name="budget_min" /></label>
+          <label>Budget Max <input type="number" name="budget_max" /></label>
+          <label>Skills Required (comma separated) <input name="skills_required" /></label>
+          <label>Deadline <input type="date" name="deadline" /></label>
+          <button type="submit">Publish</button>
+        </form>
+        <pre id="result"></pre>
+      </section>
+    </main>
+    <script type="module" src="/js/company.js"></script>
+  </body>
+</html>
