@@ -138,14 +138,18 @@ function renderCompanyBids(target, bids) {
                 <span>Freelancer Profile: ${escapeHtml(bid.freelancer_id || "-")}</span>
                 <span>Submitted: ${formatDate(bid.created_at)}</span>
               </div>
-              <div class="project-actions bid-action-row">
-                <button type="button" class="secondary bid-action" data-action="accept" data-bid-id="${escapeHtml(bid.id)}" ${
-                  canReview ? "" : "disabled"
-                }>Accept</button>
-                <button type="button" class="ghost bid-action" data-action="reject" data-bid-id="${escapeHtml(bid.id)}" ${
-                  canReview ? "" : "disabled"
-                }>Reject</button>
-              </div>
+              ${
+                canReview
+                  ? `<div class="project-actions bid-action-row">
+                      <button type="button" class="secondary bid-action" data-action="accept" data-bid-id="${escapeHtml(
+                        bid.id
+                      )}">Accept</button>
+                      <button type="button" class="ghost bid-action" data-action="reject" data-bid-id="${escapeHtml(
+                        bid.id
+                      )}">Reject</button>
+                    </div>`
+                  : '<p class="decision-note">Decision completed for this bid.</p>'
+              }
             </article>
           `;
         })
