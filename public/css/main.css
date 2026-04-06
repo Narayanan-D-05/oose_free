@@ -142,8 +142,65 @@ pre {
   overflow: auto;
 }
 
+.project-list {
+  display: grid;
+  gap: 14px;
+}
+
+.project-card {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  background: #fffdf7;
+}
+
+.project-card h3 {
+  margin-bottom: 6px;
+}
+
+.project-meta {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 14px;
+  margin: 10px 0;
+}
+
+.skill-wrap {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.skill-tag {
+  border: 1px solid var(--line);
+  background: #f3efe5;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+.project-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.empty-state {
+  border: 1px dashed var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: #fffdf9;
+  color: var(--muted);
+}
+
 @media (max-width: 720px) {
   .container {
     padding: 14px;
+  }
+
+  .project-actions {
+    justify-content: flex-start;
   }
 }
