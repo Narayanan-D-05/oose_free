@@ -31,6 +31,16 @@ function handleError(res, error, fallback = "Unexpected server error") {
   sendJson(res, 500, { error: message });
 }
 
+async function getCompanyProfileId(userId) {
+  const { data } = await supabaseAdmin.from("company_profiles").select("id").eq("user_id", userId).single();
+  return data?.id || null;
+}
+
+async function getFreelancerProfileId(userId) {
+  const { data } = await supabaseAdmin.from("freelancer_profiles").select("id").eq("user_id", userId).single();
+  return data?.id || null;
+}
+
 export default async function handler(req, res) {
   setCors(res);
 
@@ -51,15 +61,22 @@ export default async function handler(req, res) {
     if (req.method === "POST" && pathname === "/auth/register") {
       const body = parseBody(req);
       const role = body.role;
+      const email = String(body.email || "").trim().toLowerCase();
+      const password = String(body.password || "");
 
       if (!["company", "freelancer"].includes(role)) {
         sendJson(res, 400, { error: "Role must be company or freelancer" });
         return;
       }
 
+      if (!email || !password || password.length < 8) {
+        sendJson(res, 400, { error: "Valid email and password (min 8 chars) are required" });
+        return;
+      }
+
       const { data: createdUser, error: authError } = await supabaseAdmin.auth.admin.createUser({
-        email: body.email,
-        password: body.password,
+        email,
+        password,
         email_confirm: true
       });
 
@@ -71,33 +88,50 @@ export default async function handler(req, res) {
       const newUserId = createdUser.user?.id;
       const { error: userInsertError } = await supabaseAdmin.from("users").insert({
         id: newUserId,
-        email: body.email,
+        email,
         role
       });
 
       if (userInsertError) {
+        if (newUserId) {
+          await supabaseAdmin.auth.admin.deleteUser(newUserId);
+        }
         sendJson(res, 400, { error: userInsertError.message });
         return;
       }
 
       if (role === "company") {
-        await supabaseAdmin.from("company_profiles").insert({
+        const { error: companyProfileError } = await supabaseAdmin.from("company_profiles").insert({
           user_id: newUserId,
-          company_name: body.company_name || body.email.split("@")[0]
+          company_name: body.company_name || email.split("@")[0]
         });
+
+        if (companyProfileError) {
+          await supabaseAdmin.from("users").delete().eq("id", newUserId);
+          await supabaseAdmin.auth.admin.deleteUser(newUserId);
+          sendJson(res, 400, { error: companyProfileError.message });
+          return;
+        }
       }
 
       if (role === "freelancer") {
-        await supabaseAdmin.from("freelancer_profiles").insert({
+        const { error: freelancerProfileError } = await supabaseAdmin.from("freelancer_profiles").insert({
           user_id: newUserId,
           full_name: body.full_name || "New Freelancer",
           skills: toArray(body.skills)
         });
+
+        if (freelancerProfileError) {
+          await supabaseAdmin.from("users").delete().eq("id", newUserId);
+          await supabaseAdmin.auth.admin.deleteUser(newUserId);
+          sendJson(res, 400, { error: freelancerProfileError.message });
+          return;
+        }
       }
 
       sendJson(res, 201, {
         message: "User registered successfully",
-        user: { id: newUserId, email: body.email, role }
+        user: { id: newUserId, email, role }
       });
       return;
     }
@@ -116,9 +150,14 @@ export default async function handler(req, res) {
 
       const { data: userRole } = await supabaseAdmin
         .from("users")
-        .select("role")
+        .select("role, suspended")
         .eq("id", data.user.id)
         .single();
+
+      if (userRole?.suspended) {
+        sendJson(res, 403, { error: "Account is suspended" });
+        return;
+      }
 
       sendJson(res, 200, {
         token: data.session.access_token,
@@ -192,12 +231,12 @@ export default async function handler(req, res) {
 
       let companyProfileId = body.company_id;
       if (actingUser.role === "company") {
-        const { data: profile } = await supabaseAdmin
-          .from("company_profiles")
-          .select("id")
-          .eq("user_id", actingUser.id)
-          .single();
-        companyProfileId = profile?.id;
+        companyProfileId = await getCompanyProfileId(actingUser.id);
+      }
+
+      if (!companyProfileId) {
+        sendJson(res, 400, { error: "Company profile is required to create a project" });
+        return;
       }
 
       const { data, error } = await supabaseAdmin
@@ -380,14 +419,30 @@ export default async function handler(req, res) {
       const [projectId] = projectBidsMatch;
       const body = parseBody(req);
 
+      const { data: project } = await supabaseAdmin
+        .from("projects")
+        .select("id, status")
+        .eq("id", projectId)
+        .single();
+
+      if (!project) {
+        sendJson(res, 404, { error: "Project not found" });
+        return;
+      }
+
+      if (project.status !== "open") {
+        sendJson(res, 400, { error: "Bids can only be submitted to open projects" });
+        return;
+      }
+
       let freelancerProfileId = body.freelancer_id;
       if (actingUser.role === "freelancer") {
-        const { data: profile } = await supabaseAdmin
-          .from("freelancer_profiles")
-          .select("id")
-          .eq("user_id", actingUser.id)
-          .single();
-        freelancerProfileId = profile?.id;
+        freelancerProfileId = await getFreelancerProfileId(actingUser.id);
+      }
+
+      if (!freelancerProfileId) {
+        sendJson(res, 400, { error: "Freelancer profile is required before submitting bids" });
+        return;
       }
 
       const { data, error } = await supabaseAdmin
@@ -431,6 +486,35 @@ export default async function handler(req, res) {
         return;
       }
 
+      if (bid.status !== "pending") {
+        sendJson(res, 400, { error: "Only pending bids can be accepted" });
+        return;
+      }
+
+      const { data: project } = await supabaseAdmin
+        .from("projects")
+        .select("id, company_id, status")
+        .eq("id", bid.project_id)
+        .single();
+
+      if (!project) {
+        sendJson(res, 404, { error: "Project not found for this bid" });
+        return;
+      }
+
+      if (actingUser.role === "company") {
+        const companyProfileId = await getCompanyProfileId(actingUser.id);
+        if (!companyProfileId || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only accept bids on your own projects" });
+          return;
+        }
+      }
+
+      if (!["open", "in_progress"].includes(project.status)) {
+        sendJson(res, 400, { error: "Project is not accepting bid updates" });
+        return;
+      }
+
       await supabaseAdmin.from("bids").update({ status: "rejected" }).eq("project_id", bid.project_id).neq("id", bidId);
       await supabaseAdmin.from("bids").update({ status: "accepted" }).eq("id", bidId);
       await supabaseAdmin
@@ -450,6 +534,31 @@ export default async function handler(req, res) {
       }
 
       const [bidId] = rejectBidMatch;
+      const { data: targetBid } = await supabaseAdmin.from("bids").select("*").eq("id", bidId).single();
+      if (!targetBid) {
+        sendJson(res, 404, { error: "Bid not found" });
+        return;
+      }
+
+      if (actingUser.role === "company") {
+        const companyProfileId = await getCompanyProfileId(actingUser.id);
+        const { data: project } = await supabaseAdmin
+          .from("projects")
+          .select("company_id")
+          .eq("id", targetBid.project_id)
+          .single();
+
+        if (!companyProfileId || !project || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only reject bids on your own projects" });
+          return;
+        }
+      }
+
+      if (targetBid.status !== "pending") {
+        sendJson(res, 400, { error: "Only pending bids can be rejected" });
+        return;
+      }
+
       const { data, error } = await supabaseAdmin.from("bids").update({ status: "rejected" }).eq("id", bidId).select("*").single();
 
       if (error) {
@@ -468,7 +577,28 @@ export default async function handler(req, res) {
         return;
       }
       const [bidId] = bidDeleteMatch;
-      const { error } = await supabaseAdmin.from("bids").delete().eq("id", bidId);
+
+      const { data: targetBid } = await supabaseAdmin.from("bids").select("*").eq("id", bidId).single();
+
+      if (!targetBid) {
+        sendJson(res, 404, { error: "Bid not found" });
+        return;
+      }
+
+      if (actingUser.role === "freelancer") {
+        const freelancerProfileId = await getFreelancerProfileId(actingUser.id);
+        if (!freelancerProfileId || freelancerProfileId !== targetBid.freelancer_id) {
+          sendJson(res, 403, { error: "You can only withdraw your own bids" });
+          return;
+        }
+      }
+
+      if (targetBid.status !== "pending") {
+        sendJson(res, 400, { error: "Only pending bids can be withdrawn" });
+        return;
+      }
+
+      const { error } = await supabaseAdmin.from("bids").update({ status: "withdrawn" }).eq("id", bidId);
 
       if (error) {
         sendJson(res, 400, { error: error.message });
@@ -505,6 +635,25 @@ export default async function handler(req, res) {
       const [projectId] = projectMilestonesMatch;
       const body = parseBody(req);
 
+      const { data: project } = await supabaseAdmin
+        .from("projects")
+        .select("id, company_id")
+        .eq("id", projectId)
+        .single();
+
+      if (!project) {
+        sendJson(res, 404, { error: "Project not found" });
+        return;
+      }
+
+      if (actingUser.role === "company") {
+        const companyProfileId = await getCompanyProfileId(actingUser.id);
+        if (!companyProfileId || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only create milestones for your own projects" });
+          return;
+        }
+      }
+
       const { data, error } = await supabaseAdmin
         .from("milestones")
         .insert({
@@ -536,6 +685,36 @@ export default async function handler(req, res) {
       const [milestoneId] = submitMilestoneMatch;
       const body = parseBody(req);
 
+      const { data: milestone } = await supabaseAdmin
+        .from("milestones")
+        .select("id, project_id, status")
+        .eq("id", milestoneId)
+        .single();
+
+      if (!milestone) {
+        sendJson(res, 404, { error: "Milestone not found" });
+        return;
+      }
+
+      if (actingUser.role === "freelancer") {
+        const freelancerProfileId = await getFreelancerProfileId(actingUser.id);
+        const { data: project } = await supabaseAdmin
+          .from("projects")
+          .select("awarded_to")
+          .eq("id", milestone.project_id)
+          .single();
+
+        if (!freelancerProfileId || !project || project.awarded_to !== freelancerProfileId) {
+          sendJson(res, 403, { error: "You can only submit milestones for your awarded projects" });
+          return;
+        }
+      }
+
+      if (!["pending", "in_progress", "rejected"].includes(milestone.status)) {
+        sendJson(res, 400, { error: "This milestone cannot be submitted in its current status" });
+        return;
+      }
+
       const { data, error } = await supabaseAdmin
         .from("milestones")
         .update({
@@ -564,6 +743,36 @@ export default async function handler(req, res) {
       }
       const [milestoneId] = approveMilestoneMatch;
 
+      const { data: milestone } = await supabaseAdmin
+        .from("milestones")
+        .select("id, project_id, status")
+        .eq("id", milestoneId)
+        .single();
+
+      if (!milestone) {
+        sendJson(res, 404, { error: "Milestone not found" });
+        return;
+      }
+
+      if (milestone.status !== "submitted") {
+        sendJson(res, 400, { error: "Only submitted milestones can be approved" });
+        return;
+      }
+
+      if (actingUser.role === "company") {
+        const companyProfileId = await getCompanyProfileId(actingUser.id);
+        const { data: project } = await supabaseAdmin
+          .from("projects")
+          .select("company_id")
+          .eq("id", milestone.project_id)
+          .single();
+
+        if (!companyProfileId || !project || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only approve milestones for your own projects" });
+          return;
+        }
+      }
+
       const { data, error } = await supabaseAdmin
         .from("milestones")
         .update({
@@ -591,6 +800,36 @@ export default async function handler(req, res) {
       }
       const [milestoneId] = rejectMilestoneMatch;
 
+      const { data: milestone } = await supabaseAdmin
+        .from("milestones")
+        .select("id, project_id, status")
+        .eq("id", milestoneId)
+        .single();
+
+      if (!milestone) {
+        sendJson(res, 404, { error: "Milestone not found" });
+        return;
+      }
+
+      if (milestone.status !== "submitted") {
+        sendJson(res, 400, { error: "Only submitted milestones can be rejected" });
+        return;
+      }
+
+      if (actingUser.role === "company") {
+        const companyProfileId = await getCompanyProfileId(actingUser.id);
+        const { data: project } = await supabaseAdmin
+          .from("projects")
+          .select("company_id")
+          .eq("id", milestone.project_id)
+          .single();
+
+        if (!companyProfileId || !project || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only reject milestones for your own projects" });
+          return;
+        }
+      }
+
       const { data, error } = await supabaseAdmin
         .from("milestones")
         .update({
@@ -616,13 +855,61 @@ export default async function handler(req, res) {
       }
 
       const body = parseBody(req);
+      if (!body.project_id || !body.reviewee_id || !body.rating) {
+        sendJson(res, 400, { error: "project_id, reviewee_id and rating are required" });
+        return;
+      }
+
+      const numericRating = Number(body.rating);
+      if (!Number.isInteger(numericRating) || numericRating < 1 || numericRating > 5) {
+        sendJson(res, 400, { error: "Rating must be an integer between 1 and 5" });
+        return;
+      }
+
+      if (body.reviewee_id === current.id) {
+        sendJson(res, 400, { error: "You cannot review yourself" });
+        return;
+      }
+
+      const { data: project } = await supabaseAdmin
+        .from("projects")
+        .select("id, status, company_id, awarded_to")
+        .eq("id", body.project_id)
+        .single();
+
+      if (!project) {
+        sendJson(res, 404, { error: "Project not found" });
+        return;
+      }
+
+      if (project.status !== "completed") {
+        sendJson(res, 400, { error: "Reviews are allowed only after project completion" });
+        return;
+      }
+
+      if (current.role === "company") {
+        const companyProfileId = await getCompanyProfileId(current.id);
+        if (!companyProfileId || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only review projects owned by your company" });
+          return;
+        }
+      }
+
+      if (current.role === "freelancer") {
+        const freelancerProfileId = await getFreelancerProfileId(current.id);
+        if (!freelancerProfileId || freelancerProfileId !== project.awarded_to) {
+          sendJson(res, 403, { error: "You can only review projects awarded to you" });
+          return;
+        }
+      }
+
       const { data, error } = await supabaseAdmin
         .from("reviews")
         .insert({
           project_id: body.project_id,
           reviewer_id: current.id,
           reviewee_id: body.reviewee_id,
-          rating: body.rating,
+          rating: numericRating,
           comment: body.comment,
           reviewer_role: current.role
         })
@@ -692,6 +979,38 @@ export default async function handler(req, res) {
         return;
       }
       const body = parseBody(req);
+
+      if (!body.project_id || !body.reason) {
+        sendJson(res, 400, { error: "project_id and reason are required" });
+        return;
+      }
+
+      const { data: project } = await supabaseAdmin
+        .from("projects")
+        .select("id, company_id, awarded_to")
+        .eq("id", body.project_id)
+        .single();
+
+      if (!project) {
+        sendJson(res, 404, { error: "Project not found" });
+        return;
+      }
+
+      if (current.role === "company") {
+        const companyProfileId = await getCompanyProfileId(current.id);
+        if (!companyProfileId || companyProfileId !== project.company_id) {
+          sendJson(res, 403, { error: "You can only raise disputes for your own projects" });
+          return;
+        }
+      }
+
+      if (current.role === "freelancer") {
+        const freelancerProfileId = await getFreelancerProfileId(current.id);
+        if (!freelancerProfileId || freelancerProfileId !== project.awarded_to) {
+          sendJson(res, 403, { error: "You can only raise disputes for projects awarded to you" });
+          return;
+        }
+      }
 
       const { data, error } = await supabaseAdmin
         .from("disputes")
