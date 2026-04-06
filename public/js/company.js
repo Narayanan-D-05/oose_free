@@ -246,8 +246,13 @@ async function initCompanyBidsPage() {
   });
 
   bidsOutput.addEventListener("click", async (event) => {
-    const target = event.target;
-    if (!(target instanceof HTMLElement) || !target.classList.contains("bid-action")) {
+    const clickedElement = event.target;
+    if (!(clickedElement instanceof HTMLElement)) {
+      return;
+    }
+
+    const target = clickedElement.closest(".bid-action");
+    if (!(target instanceof HTMLButtonElement)) {
       return;
     }
 
@@ -258,6 +263,7 @@ async function initCompanyBidsPage() {
     }
 
     target.disabled = true;
+    target.textContent = action === "accept" ? "Accepting..." : "Rejecting...";
     setBidsFeedback("");
     try {
       if (action === "accept") {
@@ -273,6 +279,7 @@ async function initCompanyBidsPage() {
     } catch (error) {
       setBidsFeedback(error.message, "error");
       target.disabled = false;
+      target.textContent = action === "accept" ? "Accept" : "Reject";
     }
   });
 }

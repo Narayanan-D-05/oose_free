@@ -601,12 +601,40 @@ export default async function handler(req, res) {
         return;
       }
 
-      await supabaseAdmin.from("bids").update({ status: "rejected" }).eq("project_id", bid.project_id).neq("id", bidId);
-      await supabaseAdmin.from("bids").update({ status: "accepted" }).eq("id", bidId);
-      await supabaseAdmin
+      const { error: rejectOthersError } = await supabaseAdmin
+        .from("bids")
+        .update({ status: "rejected" })
+        .eq("project_id", bid.project_id)
+        .neq("id", bidId)
+        .eq("status", "pending");
+
+      if (rejectOthersError) {
+        sendJson(res, 400, { error: rejectOthersError.message });
+        return;
+      }
+
+      const { data: acceptedBid, error: acceptError } = await supabaseAdmin
+        .from("bids")
+        .update({ status: "accepted" })
+        .eq("id", bidId)
+        .eq("status", "pending")
+        .select("id")
+        .single();
+
+      if (acceptError || !acceptedBid) {
+        sendJson(res, 400, { error: acceptError?.message || "Unable to mark bid as accepted" });
+        return;
+      }
+
+      const { error: projectUpdateError } = await supabaseAdmin
         .from("projects")
         .update({ status: "in_progress", awarded_to: bid.freelancer_id })
         .eq("id", bid.project_id);
+
+      if (projectUpdateError) {
+        sendJson(res, 400, { error: projectUpdateError.message });
+        return;
+      }
 
       sendJson(res, 200, { message: "Bid accepted and project updated" });
       return;
