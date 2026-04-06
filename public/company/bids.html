@@ -1,5 +1,39 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>Company Bids</title><link rel="stylesheet" href="/css/main.css" /></head>
-  <body><main class="container"><section class="card"><h1>Bids</h1><p>Use API endpoint /api/projects/:id/bids to inspect bids for a project.</p></section></main></body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Company Bids</title>
+    <link rel="stylesheet" href="/css/main.css" />
+    <link rel="stylesheet" href="/css/company.css" />
+  </head>
+  <body>
+    <main class="container">
+      <section class="card hero-company">
+        <div class="header">
+          <h1>Manage Project Bids</h1>
+          <div class="nav">
+            <a href="/company/dashboard.html">Dashboard</a>
+            <a href="/company/post-project.html">Post Project</a>
+            <button id="logout-btn" class="ghost">Logout</button>
+          </div>
+        </div>
+
+        <div class="grid grid-2">
+          <label>
+            Select Project
+            <select id="project-select"></select>
+          </label>
+          <div class="project-actions">
+            <button id="reload-bids-btn" type="button" class="secondary">Refresh Bids</button>
+          </div>
+        </div>
+
+        <p id="bids-feedback" class="inline-feedback" hidden></p>
+        <div id="bids-output" class="dashboard-panel" aria-live="polite">Loading bids...</div>
+      </section>
+    </main>
+    <script type="module" src="/js/auth.js"></script>
+    <script type="module" src="/js/company.js"></script>
+  </body>
 </html>

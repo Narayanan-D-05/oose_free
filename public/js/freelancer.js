@@ -9,12 +9,64 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
+function formatCurrency(value) {
+  const numericValue = Number(value);
+  if (Number.isNaN(numericValue)) {
+    return "Not specified";
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0
+  }).format(numericValue);
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "No deadline";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "No deadline";
+  }
+
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
+  });
+}
+
+function removeDuplicateProjects(projects) {
+  const seen = new Set();
+  return (projects || []).filter((project) => {
+    const fingerprint = [
+      project?.company_id || "",
+      String(project?.title || "").trim().toLowerCase(),
+      String(project?.description || "").trim().toLowerCase(),
+      Number(project?.budget_min || 0),
+      Number(project?.budget_max || 0),
+      project?.deadline || ""
+    ].join("|");
+
+    if (seen.has(fingerprint)) {
+      return false;
+    }
+    seen.add(fingerprint);
+    return true;
+  });
+}
+
 function renderProjects(projects) {
-  if (!projects || projects.length === 0) {
+  const uniqueProjects = removeDuplicateProjects(projects);
+
+  if (!uniqueProjects || uniqueProjects.length === 0) {
     return '<div class="empty-state">No open projects yet. Check back soon.</div>';
   }
 
-  return projects
+  return uniqueProjects
     .map((project) => {
       const skills = (project.skills_required || [])
         .map((skill) => `<span class="skill-tag">${escapeHtml(skill)}</span>`)
@@ -28,8 +80,8 @@ function renderProjects(projects) {
           </div>
           <p>${escapeHtml(project.description || "No description")}</p>
           <div class="project-meta">
-            <span>Budget: $${project.budget_min || 0} - $${project.budget_max || 0}</span>
-            <span>Deadline: ${escapeHtml(project.deadline || "N/A")}</span>
+            <span>Budget: ${formatCurrency(project.budget_min)} - ${formatCurrency(project.budget_max)}</span>
+            <span>Deadline: ${formatDate(project.deadline)}</span>
           </div>
           <div class="skill-wrap">${skills || '<span class="skill-tag">General</span>'}</div>
           <div class="project-actions">
@@ -79,7 +131,8 @@ if (bidForm) {
         method: "POST",
         body: JSON.stringify(payload)
       });
-      document.getElementById("result").textContent = `Bid submitted successfully.\n\n${JSON.stringify(data.bid, null, 2)}`;
+      const actionText = data.updated ? "Bid updated successfully." : "Bid submitted successfully.";
+      document.getElementById("result").textContent = `${actionText}\n\n${JSON.stringify(data.bid, null, 2)}`;
     } catch (error) {
       document.getElementById("result").textContent = error.message;
     }

@@ -196,6 +196,50 @@ export default async function handler(req, res) {
       return;
     }
 
+    if (req.method === "GET" && pathname === "/company/projects") {
+      const actingUser = await requireRole(req, res, ["company", "admin"]);
+      if (!actingUser) {
+        return;
+      }
+
+      let companyProfileId = url.searchParams.get("company_id") || null;
+      const statusParam = url.searchParams.get("status") || "";
+      const statuses = statusParam
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      if (actingUser.role === "company") {
+        companyProfileId = await getCompanyProfileId(actingUser.id);
+      }
+
+      if (!companyProfileId) {
+        sendJson(res, 400, { error: "Company profile is required" });
+        return;
+      }
+
+      let query = supabaseAdmin
+        .from("projects")
+        .select("*")
+        .eq("company_id", companyProfileId)
+        .order("created_at", { ascending: false });
+
+      if (statuses.length === 1) {
+        query = query.eq("status", statuses[0]);
+      } else if (statuses.length > 1) {
+        query = query.in("status", statuses);
+      }
+
+      const { data, error } = await query;
+      if (error) {
+        sendJson(res, 400, { error: error.message });
+        return;
+      }
+
+      sendJson(res, 200, { projects: data });
+      return;
+    }
+
     if (req.method === "GET" && pathname === "/projects") {
       const status = url.searchParams.get("status") || "open";
       const skills = toArray(url.searchParams.get("skills"));
@@ -445,6 +489,44 @@ export default async function handler(req, res) {
         return;
       }
 
+      const { data: existingBid } = await supabaseAdmin
+        .from("bids")
+        .select("id, status")
+        .eq("project_id", projectId)
+        .eq("freelancer_id", freelancerProfileId)
+        .maybeSingle();
+
+      if (existingBid) {
+        if (existingBid.status === "accepted") {
+          sendJson(res, 409, { error: "Your bid has already been accepted for this project" });
+          return;
+        }
+
+        const { data: updatedBid, error: updateError } = await supabaseAdmin
+          .from("bids")
+          .update({
+            bid_amount: body.bid_amount,
+            cover_letter: body.cover_letter,
+            estimated_days: body.estimated_days,
+            status: "pending"
+          })
+          .eq("id", existingBid.id)
+          .select("*")
+          .single();
+
+        if (updateError) {
+          sendJson(res, 400, { error: updateError.message });
+          return;
+        }
+
+        sendJson(res, 200, {
+          message: "Existing bid updated",
+          bid: updatedBid,
+          updated: true
+        });
+        return;
+      }
+
       const { data, error } = await supabaseAdmin
         .from("bids")
         .insert({
@@ -459,6 +541,10 @@ export default async function handler(req, res) {
         .single();
 
       if (error) {
+        if (error.code === "23505") {
+          sendJson(res, 409, { error: "You already submitted a bid for this project. Edit your existing bid instead." });
+          return;
+        }
         sendJson(res, 400, { error: error.message });
         return;
       }

@@ -187,6 +187,10 @@ pre {
   justify-content: flex-end;
 }
 
+.bid-action-row {
+  gap: 8px;
+}
+
 .empty-state {
   border: 1px dashed var(--line);
   border-radius: 12px;
