@@ -12,14 +12,18 @@
       <section class="card hero-admin">
         <div class="header">
           <h1>Admin Control Center</h1>
-          <button id="logout-btn" class="ghost">Logout</button>
+          <div class="nav">
+            <a href="/admin/users.html">Users</a>
+            <a href="/admin/disputes.html">Disputes</a>
+            <button id="logout-btn" class="ghost">Logout</button>
+          </div>
         </div>
         <h2>Stats</h2>
-        <pre id="stats-output">Loading...</pre>
+        <div id="stats-output" class="dashboard-panel" aria-live="polite">Loading stats...</div>
         <h2>Users</h2>
-        <pre id="users-output">Loading...</pre>
+        <div id="users-output" class="dashboard-panel" aria-live="polite">Loading users...</div>
         <h2>Disputes</h2>
-        <pre id="disputes-output">Loading...</pre>
+        <div id="disputes-output" class="dashboard-panel" aria-live="polite">Loading disputes...</div>
       </section>
     </main>
     <script type="module" src="/js/auth.js"></script>

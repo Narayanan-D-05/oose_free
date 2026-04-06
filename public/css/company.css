@@ -1,3 +1,12 @@
 .hero-company {
   background: linear-gradient(135deg, #d8ebff, #f1f8ff);
 }
+
+.hero-company .notice {
+  border-left-color: #2d7ec7;
+  background: #edf5ff;
+}
+
+.hero-company .project-card {
+  background: linear-gradient(180deg, #ffffff, #f8fbff);
+}
